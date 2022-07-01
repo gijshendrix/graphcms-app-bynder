@@ -14,7 +14,7 @@ Installation can be done through the install url. As part of the setup, you'll c
 | Default domain editable | Determines whether users be able to change the default domain when adding assets. |
 | Available asset types | Determines which asset types your users will be able to select.  |
 
-The available asset types can be overridden on specific fields. This has to be done in the field configuration dialog, using a string of the following format: ``["image", "audio", "video", "document"]`. Make sure to remove the types you don't want to allow.
+The available asset types can be overridden on specific fields. This has to be done in the field configuration dialog, using a string of the following format: `["image", "audio", "video", "document"]`. Make sure to remove the types you don't want to allow.
 
 ## Resources
 
