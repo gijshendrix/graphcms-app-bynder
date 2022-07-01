@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <title>GraphCMS Bynder App</title>
+
+    <link rel="stylesheet" type="text/css" href="./style.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Inter:500" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/@graphcms/zoid@9.0.64-alpha.1/lib/zoid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@graphcms/app-sdk@0.0.4-alpha.0/dist/app-sdk.umd.production.min.js"></script>
+    <script src="./helpers.js"></script>        
+
+    <script>
+      ((props) => {      
+
+        async function init() {
+          try {
+            window["@graphcms/app-sdk"].init({
+              onProps: function(newProps) {
+                props = newProps;
+                updatePreview();
+              }
+            }).then((initialState) => {
+              props = initialState.props;              
+              if (initialState.status === "ok") {
+                if (props.isTableCell) return; //No button needed
+                initDialogButton();
+              }
+            });
+          } catch(error) {
+            console.error("Failed to init extension:", error.message);
+            console.error("- error code:", error.code);
+          }
+        }
+
+        function getAssets() {
+          return (props && props.value && props.value.length) ? props.value : [];
+        }
+
+        function initDialogButton() {
+          const buttonElement = document.getElementById("open-dialog-button");
+          buttonElement.style.display = "block";
+
+          let asset_types = "";
+          if (props.fieldConfig && props.fieldConfig.asset_types && props.fieldConfig.asset_types.length) asset_types = props.fieldConfig.asset_types;
+          if (!asset_types.length) asset_types = serialize(props.extension.config.asset_types);
+
+          const options = {
+            disableOverlayClick: false,
+            maxWidth: "80vw",
+            ariaLabel: "Bynder picker dialog",
+            defaultDomain: props.extension.config.default_domain,
+            defaultDomainEditable: props.extension.config.domain_editable,
+            allowedAssetTypes: asset_types,
+            isList: props.field.isList,
+          };
+
+          buttonElement.addEventListener("click", () => showDialog(options));
+        }
+        
+        function updateDialogButton(nrofassets) {
+          if (props.field.isList) return;
+          const buttonElement = document.getElementById("open-dialog-button");
+          if (nrofassets == 0) {
+            buttonElement.innerText = "Select asset from Bynder";
+            return;
+          }
+          buttonElement.innerText = "Replace asset from Bynder";
+        }         
+
+        async function showDialog(options) {
+          try {
+            options.selectedAssetIds = serialize(getAssets().map(item => item.databaseId));
+            const response = await props.openDialog("./dialog.html", options);
+            if (response === undefined) return;
+            const assets = deserialize(response);
+            await props.onChange(assets);
+          } catch (error) {
+            console.error("Error opening dialog: ", error.code, error.message);
+          }
+        }
+        
+        async function updatePreview() {
+          const assets = getAssets();
+          var container = document.getElementById("assets");
+          if (props.isTableCell) container.classList.add("assets-table");
+          container.innerHTML = "";
+          addThumbnails(container, assets);
+          updateDialogButton(assets.length);
+        }
+
+        function addThumbnails(container, assets) {
+          assets.map(makeThumbnail.bind(null, container))
+            .forEach(div => { container.appendChild(div); });
+        }
+
+        function makeThumbnail(container, asset) {
+          const previewdiv = document.createElement("div");
+          if (props.isTableCell) previewdiv.classList.add("previewdiv-table");           
+          else previewdiv.classList.add("previewdiv");           
+
+          const text = document.createElement("p");
+          text.classList.add("overlay-text");
+          text.innerText = asset.type.toLowerCase();
+          previewdiv.appendChild(text);
+
+          switch (asset.type.toLowerCase()) {
+            case "image":
+            case "audio":
+            case "document":
+              const img = document.createElement("img");
+              if (props.isTableCell){
+                img.classList.add("previewelt-table");
+                img.src = asset.files.mini.url.length ? asset.files.mini.url : "./images/no-preview-available.png";
+              } else {
+                img.classList.add("previewelt");
+                img.src = asset.files.webImage.url.length ? asset.files.webImage.url : "./images/no-preview-available.png";
+              }
+              img.addEventListener("click", () => window.open(asset.url, "_blank").focus());
+              previewdiv.appendChild(img);
+              break;
+            case "video":
+              if (asset.previewUrls.length && !props.isTableCell) {
+                const video = document.createElement("video");
+                video.classList.add("previewelt")
+                video.controls = true;
+                const source = document.createElement("source"); 
+                source.type = "video/webm";
+                source.src = asset.previewUrls[0];
+                video.appendChild(source);
+                video.addEventListener("click", () => window.open(asset.url, "_blank").focus());
+                previewdiv.appendChild(video);
+                break;
+              }
+              const videoimg = document.createElement("img");
+              if (props.isTableCell) {
+                videoimg.classList.add("previewelt-table");
+                videoimg.src = asset.files.mini.url.length ? asset.files.mini.url : "./images/no-preview-available.png";
+              } else {
+                videoimg.classList.add("previewelt");
+                videoimg.src = asset.files.webImage.url.length ? asset.files.webImage.url : "./images/no-preview-available.png";
+              }
+              videoimg.addEventListener("click", () => window.open(asset.url, "_blank").focus());
+              previewdiv.appendChild(videoimg);
+              break;
+            default:
+              const defaultimg = document.createElement("img");
+              if (props.isTableCell) defaultimg.classList.add("previewelt-table");
+              else defaultimg.classList.add("previewelt");
+              defaultimg.src = "./images/no-preview-available.png";
+              defaultimg.addEventListener("click", () => window.open(asset.url, "_blank").focus());
+              previewdiv.appendChild(defaultimg);               
+          }
+
+          if (!props.isTableCell) {
+            const button = document.createElement("button");
+            button.className = "remove-asset-button";
+            button.addEventListener("click", async () => {
+              await removeAsset(asset);
+            });
+            button.innerText = "X";
+            previewdiv.appendChild(button);
+          }
+
+          return previewdiv;
+        }
+
+        async function removeAsset({ databaseId }) {
+          const updatedAssets = getAssets().filter(asset => databaseId !== asset.databaseId);
+          await props.onChange(updatedAssets);
+        }        
+
+        document.addEventListener("DOMContentLoaded", init);
+        
+      })();
+      
+    </script>
+  </head>
+  <body>
+    <div id="assets"></div>
+    <button id="open-dialog-button">Select assets from Bynder</button>
+  </body>
+</html>

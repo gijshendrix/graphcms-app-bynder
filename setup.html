@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <title>GraphCMS Bynder App</title>
+
+    <link rel="stylesheet" type="text/css" href="./style.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Inter:500" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/@graphcms/zoid@9.0.64-alpha.1/lib/zoid.min.js"></script>    
+    <script src="https://cdn.jsdelivr.net/npm/@graphcms/app-sdk@0.0.4-alpha.0/dist/app-sdk.umd.production.min.js"></script>
+
+    <script>
+      ((props) => {
+        function showError(errorelt) {
+          if(errorelt) errorelt.style.display = "inline";
+        }
+
+        function hideError(errorelt) {
+          if(errorelt) errorelt.style.display = "none";
+        }
+
+        function buttonClicked(event) {
+          event.preventDefault(); //Avoid the default form submit behavior which will cause an error
+
+          //Read values
+          const defaultDomain = document.forms["bynder-form"].default_domain.value;
+          const domainEditable = document.forms["bynder-form"].domain_editable.value === "true";
+          const assetTypes = Array.from(document.forms["bynder-form"].asset_types).filter(checkbox => checkbox.checked).map(checkbox => checkbox.value);
+
+          //Check if values are properly filled in
+          let error = false;
+          if (!defaultDomain.length) {
+            showError(document.getElementById("default_domain_error"));
+            error = true;
+          }
+          if (!assetTypes.length) {
+            showError(document.getElementById("asset_types_error"));
+            error = true;
+          }
+          if (error) return;
+
+          props.updateInstallation({
+            status: "COMPLETED",
+            config: { 
+              "default_domain": defaultDomain,
+              "domain_editable": domainEditable,
+              "asset_types": assetTypes,
+             },
+          });
+        }
+
+        function doPrep() {
+          //Set initial values if there are any
+          if (props.installation.config && Object.keys(props.installation.config).length) {
+            document.forms["bynder-form"].default_domain.value = props.installation.config.default_domain;
+            document.forms["bynder-form"].domain_editable.value = props.installation.config.domain_editable;
+            document.forms["bynder-form"].asset_types.forEach(element => element.checked = props.installation.config.asset_types.includes(element.value));
+          }
+
+          //Prep handling form submit
+          const buttonElement = document.getElementById("submit");
+          buttonElement.addEventListener("click", buttonClicked);
+
+          //Prep hiding errors when input receives focus
+          document.getElementsByName("default_domain").forEach(element => {element.addEventListener("input", () => hideError(document.getElementById("default_domain_error")))});
+          document.getElementsByName("asset_types").forEach(element => {element.addEventListener("input", () => hideError(document.getElementById("asset_types_error")))});
+        }
+
+        async function init() {
+          try {
+            window["@graphcms/app-sdk"].init({
+              onProps: function(newProps) {
+                props = newProps;
+              }
+            }).then((initialState) => {
+              props = initialState.props;              
+              if (initialState.status === "ok") {
+                doPrep();
+              }
+            });
+          } catch(error) {
+            console.error("Failed to init app:", error.message);
+            console.error("- error code:", error.code);
+          }
+        }
+
+        document.addEventListener("DOMContentLoaded", init);
+        
+      })();
+      
+    </script>    
+
+  </head>
+  <body>
+    <form id="bynder-form">
+      <div class="input-group">
+        <div class="input-label">
+          <label>Default domain</label>
+          <p>Your Bynder portal url</p>
+        </div>        
+        <input name="default_domain" />
+        <p id="default_domain_error" class="error">This field is required</p>
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <label>Make default domain editable</label>
+          <p>Should users be able to change the default domain?</p>
+        </div>
+        <div class="radio-group">
+          <input type="radio" class="radio" name="domain_editable" value=false checked>
+          <label for="no">No</label><br>
+          <input type="radio" class="radio" name="domain_editable" value=true>
+          <label for="yes">Yes</label><br>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <label>Available asset types</label>
+          <p>Determines which asset types users will be able to select</p>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" name="asset_types" value="image" checked>
+          <label for="image">Image</label><br>
+          <input type="checkbox" name="asset_types" value="video" checked>
+          <label for="video">Video</label><br>
+          <input type="checkbox" name="asset_types" value="document">
+          <label for="document">Document</label><br>
+          <input type="checkbox" name="asset_types" value="audio">
+          <label for="audio">Audio</label><br>
+        </div>
+        <p id="asset_types_error" class="error">Select at least 1 option</p>
+      </div>      
+
+      <button id="submit" class="submit">Submit</button>
+    </form>
+  </body>
+</html>

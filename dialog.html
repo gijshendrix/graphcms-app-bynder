@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>GraphCMS Bynder App Dialog</title>
+
+    <style>
+      body {
+        margin: 0px;
+      }
+      #bynder {
+        height: 100%;
+        width: 100%;
+      }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@graphcms/zoid@9.0.64-alpha.1/lib/zoid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@graphcms/app-sdk@0.0.4-alpha.0/dist/app-sdk.umd.production.min.js"></script>  
+  <script src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-3-latest.js"></script>
+  <script src="./helpers.js"></script>    
+
+  <script>
+    (() => {
+
+      document.addEventListener("DOMContentLoaded", async () => {
+        try {
+          window["@graphcms/app-sdk"].init({}).then((initialState) => {
+            const { status, props } = initialState;
+            if (status === "ok") {
+              const {
+                defaultDomain,
+                defaultDomainEditable,
+                allowedAssetTypes,
+                isList,
+                selectedAssetIds,
+                onCloseDialog,
+              } = props;
+
+              BynderCompactView.open({
+                container: document.getElementById("bynder"),
+                portal: {url: defaultDomain || "", editable: defaultDomainEditable},
+                language: "en_US",
+                mode: props.isList ? "MultiSelect" : "SingleSelect",
+                assetTypes: deserialize(allowedAssetTypes) || ["image", "audio", "video", "document"],
+                selectedAssets: deserialize(selectedAssetIds) || [],
+                onSuccess: function(assets, additionalInfo) {
+                  onCloseDialog(serialize(assets));
+                }
+              });        
+            }
+          });
+        } catch(error) {
+          console.error("Failed to init extension:", error.message);
+          console.error("- error code:", error.code);
+        }
+      });          
+    })();
+  </script>
+</head>
+  <body>
+    <div id="bynder"></div>
+  </body>
+</html>
